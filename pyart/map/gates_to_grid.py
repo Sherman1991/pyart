@@ -119,8 +119,19 @@ def map_gates_to_grid(
     fields = _determine_fields(fields, radars)
     grid_starts, grid_steps = _find_grid_params(grid_shape, grid_limits)
     offsets = _find_offsets(radars, projparams, grid_origin_alt)
+
+    max_space_radars = np.empty(len(radars))
+    if roi_func == 'max_space':
+        for radar in radars:
+            gate_x = radar.gate_x['data'][:, -1]
+            gate_y = radar.gate_y['data'][:, -1]
+            spacing = np.sqrt(np.diff(gate_x)**2 + np.diff(gate_y)**2)
+            max_space_radars.append(np.max(spacing))
+        max_az_spacing = np.max(max_space_radars)
+
     roi_func = _parse_roi_func(roi_func, constant_roi, z_factor, xy_factor,
-                               min_radius, h_factor, nb, bsp, offsets)
+                               min_radius, h_factor, nb, bsp, offsets,
+                               max_az_spacing)
 
     # prepare grid storage arrays
     nfields = len(fields)
@@ -165,7 +176,7 @@ def map_gates_to_grid(
             radar.ngates, radar.nrays, gate_z.astype('float32'),
             gate_y.astype('float32'), gate_x.astype('float32'),
             field_data, field_mask, excluded_gates,
-            toa, roi_func, cy_weighting_function)
+            toa, roi_func, cy_weighting_function, max_az_spacing)
 
     # create and return the grid dictionary
     mweight = np.ma.masked_equal(grid_wsum, 0)
@@ -289,7 +300,7 @@ def _find_grid_params(grid_shape, grid_limits):
 
 
 def _parse_roi_func(roi_func, constant_roi, z_factor, xy_factor, min_radius,
-                    h_factor, nb, bsp, offsets):
+                    h_factor, nb, bsp, offsets max_az_spacing):
     """ Return the Radius of influence object. """
     if not isinstance(roi_func, RoIFunction):
         if roi_func == 'constant':
@@ -299,7 +310,7 @@ def _parse_roi_func(roi_func, constant_roi, z_factor, xy_factor, min_radius,
         elif roi_func == 'dist_beam':
             roi_func = DistBeamRoI(h_factor, nb, bsp, min_radius, offsets)
         elif roi_func == 'max_space':
-            roi_func = MaxSpaceRoI(ranges, azimuths)
+            roi_func = MaxSpaceRoI(max_az_spacing)
         else:
             raise ValueError('unknown roi_func: %s' % roi_func)
     return roi_func

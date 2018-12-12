@@ -608,7 +608,7 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
             roi_func = _gen_roi_func_dist_beam(
                 h_factor, nb, bsp, min_radius, offsets)
         elif roi_func == 'max_space':
-            roi_func = _gen_roi_func_max_space(ranges, azimuth)
+            roi_func = _gen_roi_func_max_space(max_az_spacing)
         else:
             raise ValueError('unknown roi_func: %s' % roi_func)
 
@@ -669,7 +669,7 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
                 weights = np.exp(-dist2 / (2.0 * r2)) + 1e-5
                 warnings.warn("Barnes weighting function is deprecated."
                               " Please use Barnes 2 to be consistent with"
-                              " Pauley and Wu 1990.")
+                              " Pauley and Wu 1990.", DeprecationWarning)
             elif weighting_function.upper() == 'BARNES2':
                 weights = np.exp(-dist2 / (r2/4)) + 1e-5
             value = np.ma.average(nn_field_data, weights=weights, axis=0)

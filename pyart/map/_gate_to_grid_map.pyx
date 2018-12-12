@@ -158,11 +158,11 @@ cdef class DistBeamRoI(RoIFunction):
 cdef class MaxSpaceRoI(RoIFunction):
     """ Maximum azimuthal spacing radius of influence class. """
 
-    cdef float max_space_roi
+    cdef float max_az_spacing
 
-    def __init__(self, float max_space_roi):
+    def __init__(self, float max_az_spacing):
         """ intialize. """
-        self.max_space_roi = max_space_roi
+        self.max_space_roi = max_az_spacing * (8/3)
 
     cpdef float get_roi(self, float z, float y, float x):
         """ Return maximum azimuthal spacing radius of influence. """
