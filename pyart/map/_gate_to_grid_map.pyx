@@ -14,6 +14,7 @@ a uniform grid.
     ConstantRoI
     DistRoI
     DistBeamRoI
+    MaxSpaceRoI
 
 """
 
@@ -23,6 +24,7 @@ from cython.view cimport array as cvarray
 cimport cython
 
 # constants
+cdef int BARNES2 = 3
 cdef int NEAREST = 2
 cdef int CRESSMAN = 1
 cdef int BARNES = 0
@@ -153,6 +155,20 @@ cdef class DistBeamRoI(RoIFunction):
         return min_roi
 
 
+cdef class MaxSpaceRoI(RoIFunction):
+    """ Maximum azimuthal spacing radius of influence class. """
+
+    cdef float max_space_roi
+
+    def __init__(self, float max_space_roi):
+        """ intialize. """
+        self.max_space_roi = max_space_roi
+
+    cpdef float get_roi(self, float z, float y, float x):
+        """ Return maximum azimuthal spacing radius of influence. """
+        return self.max_spac_roi
+
+
 cdef class GateToGridMapper:
     """
     A class for efficient mapping of radar gates to a regular grid by
@@ -269,7 +285,7 @@ cdef class GateToGridMapper:
             Object whose get_roi method returns the radius of influence.
         weighting_function : int
             Function to use for weighting gates based upon distance.
-            0 for Barnes, 1 for Cressman and 2 for Nearest
+            0 for Barnes, 1 for Cressman, 2 for Nearest and 3 for Barnes 2
             neighbor weighting.
 
         """
@@ -378,7 +394,9 @@ cdef class GateToGridMapper:
                             continue
 
                         if weighting_function == BARNES:
-                            weight = exp(-(dist2) / (2*roi2)) + 1e-5 
+                            weight = exp(-(dist2) / (2*roi2)) + 1e-5
+                        elif weighting_function == BARNES2:
+                            weight = exp(-(dist2) / (roi2/4)) + 1e-5
                         else: # Cressman
                             weight = (roi2 - dist2) / (roi2 + dist2)
 

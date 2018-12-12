@@ -18,13 +18,17 @@ Generate a Cartesian grid by mapping from radar gates onto the grid.
 
 """
 
+import warnings
+
 import numpy as np
+
 from ..core.radar import Radar
 from ..core.transforms import geographic_to_cartesian
 from ..filters import GateFilter, moment_based_gate_filter
 
 from ._gate_to_grid_map import GateToGridMapper
-from ._gate_to_grid_map import RoIFunction, ConstantRoI, DistBeamRoI, DistRoI
+from ._gate_to_grid_map import RoIFunction, ConstantRoI, DistBeamRoI
+from ._gate_to_grid_map import DistRoI, MaxSpaceRoI
 
 
 def map_gates_to_grid(
@@ -61,6 +65,9 @@ def map_gates_to_grid(
             * dist: radius grows with the distance from each radar.
             * dist_beam: radius grows with the distance from each radar
               and parameter are based of virtual beam sizes.
+            * max_space: radius is delta (maximum azimuthal spacing)
+              multiplied by a factor of 8/3. This follows the recommendation
+              of Pauley and Wu 2010.
 
         A custom RoIFunction can be defined using the RoIFunction class
         and defining a get_roi method which returns the radius. For efficient
@@ -79,6 +86,18 @@ def map_gates_to_grid(
     map_to_grid : Create grid by finding the radius of influence around each
                   grid point.
 
+    References
+    ----------
+    Barnes S., 1964: A Technique for Maximizing Details in Numerical Weather
+    Map Analysis. Journal of Applied Meteorology and Climatology, 3(4),
+    396–409.
+
+    Cressman G., 1959: An operational objective analysis system. Monthly
+    Weather Review, 87(10), 367–374.
+
+    Pauley, P. M. and X. Wu, 1990: The theoretical, discrete, and actual
+    response of the Barnes objective analysis scheme for one- and
+    two-dimensional fields. Monthly Weather Review, 118, 1145–1164.
     """
     # make a tuple if passed a radar object as the first argument
     if isinstance(radars, Radar):
@@ -162,11 +181,16 @@ def map_gates_to_grid(
 
 def _detemine_cy_weighting_func(weighting_function):
     """ Determine cython weight function value. """
-    if weighting_function.upper() == 'NEAREST':
+    if weighting_function.upper() == 'BARNES2':
+        cy_weighting_function = 3
+    elif weighting_function.upper() == 'NEAREST':
         cy_weighting_function = 2
     elif weighting_function.upper() == 'CRESSMAN':
         cy_weighting_function = 1
     elif weighting_function.upper() == 'BARNES':
+        warnings.warn("Barnes weighting function is deprecated."
+                      " Please use Barnes 2 to be consistent with"
+                      " Pauley and Wu 1990.")
         cy_weighting_function = 0
     else:
         raise ValueError('unknown weighting_function')
@@ -274,6 +298,8 @@ def _parse_roi_func(roi_func, constant_roi, z_factor, xy_factor, min_radius,
             roi_func = DistRoI(z_factor, xy_factor, min_radius, offsets)
         elif roi_func == 'dist_beam':
             roi_func = DistBeamRoI(h_factor, nb, bsp, min_radius, offsets)
+        elif roi_func == 'max_space':
+            roi_func = MaxSpaceRoI(ranges, azimuths)
         else:
             raise ValueError('unknown roi_func: %s' % roi_func)
     return roi_func

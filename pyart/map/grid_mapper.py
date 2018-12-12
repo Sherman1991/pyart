@@ -28,6 +28,7 @@ Utilities for mapping radar objects to Cartesian grids.
 import numpy as np
 import scipy.spatial
 import netCDF4
+import warnings
 
 from ..config import get_fillvalue, get_metadata
 from ..core.transforms import geographic_to_cartesian
@@ -320,6 +321,9 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
             * dist: radius grows with the distance from each radar.
             * dist_beam: radius grows with the distance from each radar
               and parameter are based of virtual beam sizes.
+            * max_space: radius is delta (maximum azimuthal spacing)
+              multiplied by a factor of 8/3. This follows the recommendation
+              of Pauley and Wu 2010.
 
         The parameters which control these functions are listed in the
         `Other Parameters` section below.
@@ -327,7 +331,7 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
         True to include a radius of influence field in the returned
         dictionary under the 'ROI' key.  This is the value of roi_func at all
         grid points.
-    weighting_function : 'Barnes' or 'Cressman' or 'Nearest'
+    weighting_function : 'Barnes' or 'Barnes2' or 'Cressman' or 'Nearest'
         Functions used to weight nearby collected points when interpolating a
         grid point.
     toa : float
@@ -384,6 +388,18 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
     --------
     grid_from_radars : Map to grid and return a Grid object.
 
+    References
+    ----------
+    Barnes S., 1964: A Technique for Maximizing Details in Numerical Weather
+    Map Analysis. Journal of Applied Meteorology and Climatology, 3(4),
+    396–409.
+
+    Cressman G., 1959: An operational objective analysis system. Monthly
+    Weather Review, 87(10), 367–374.
+
+    Pauley, P. M. and X. Wu, 1990: The theoretical, discrete, and actual
+    response of the Barnes objective analysis scheme for one- and
+    two-dimensional fields. Monthly Weather Review, 118, 1145–1164.
     """
     # make a tuple if passed a radar object as the first argument
     if isinstance(radars, Radar):
@@ -404,7 +420,8 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
         raise ValueError('Length of gatefilters must match length of radars')
 
     # check the parameters
-    if weighting_function.upper() not in ['CRESSMAN', 'BARNES', 'NEAREST']:
+    if weighting_function.upper() not in [
+            'CRESSMAN', 'BARNES', 'NEAREST', 'BARNES2']:
         raise ValueError('unknown weighting_function')
     if algorithm not in ['kd_tree']:
         raise ValueError('unknown algorithm: %s' % algorithm)
@@ -590,6 +607,8 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
         elif roi_func == 'dist_beam':
             roi_func = _gen_roi_func_dist_beam(
                 h_factor, nb, bsp, min_radius, offsets)
+        elif roi_func == 'max_space':
+            roi_func = _gen_roi_func_max_space(ranges, azimuth)
         else:
             raise ValueError('unknown roi_func: %s' % roi_func)
 
@@ -628,7 +647,7 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
             # copy_field_data == False, use the lookup table to find the
             # radar numbers and gate numbers for the neighbors.  Then
             # use the _load_nn_field_data function to load this data from
-            # the field data object array.  This is done in Cython for speed.
+            # the field data object array. This is done in Cython for speed.
             r_nums, e_nums = divmod(lookup[ind], total_gates)
             npoints = r_nums.size
             r_nums = r_nums.astype(np.intc)
@@ -648,6 +667,11 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
                 weights = (r2 - dist2) / (r2 + dist2)
             elif weighting_function.upper() == 'BARNES':
                 weights = np.exp(-dist2 / (2.0 * r2)) + 1e-5
+                warnings.warn("Barnes weighting function is deprecated."
+                              " Please use Barnes 2 to be consistent with"
+                              " Pauley and Wu 1990.")
+            elif weighting_function.upper() == 'BARNES2':
+                weights = np.exp(-dist2 / (r2/4)) + 1e-5
             value = np.ma.average(nn_field_data, weights=weights, axis=0)
 
         grid_data[iz, iy, ix] = value
@@ -782,8 +806,8 @@ def example_roi_func_dist_beam(zg, yg, xg):
 
 def _gen_roi_func_dist_beam(h_factor, nb, bsp, min_radius, offsets):
     """
-    Return a RoI function whose radius which grows with distance
-    and whose parameters are based on virtual beam size.
+    Return a RoI function whose radius grows with distance and whose
+    parameters are based on virtual beam size.
 
     See :py:func:`map_to_grid` for a description of the parameters.
     """
@@ -799,5 +823,20 @@ def _gen_roi_func_dist_beam(h_factor, nb, bsp, min_radius, offsets):
                 np.sqrt((yg - yg_off)**2 + (xg - xg_off)**2) *
                 np.tan(nb * bsp * np.pi / 180.0), min_radius)
         return min(r)
+
+    return roi
+
+
+def _gen_roi_func_max_space():
+    """
+    Return a RoI function whose radius is based on maximum azimuthal spacing.
+
+    See :py:func:`map_to_grid` for a description of the parameters.
+    """
+
+    def roi(zg, yg, xg):
+        """ maximum azimuthal spacing radius of influence function. """
+        r = np.maximum(zg)
+        return r
 
     return roi
