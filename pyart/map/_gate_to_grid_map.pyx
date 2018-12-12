@@ -275,12 +275,12 @@ cdef class GateToGridMapper:
             Array containing masking of the field data for the radar,
             dimension are ordered as nrays, ngates, nfields.
         excluded_gates : 2D uint8 array
-            Array containing gate masking information.  Gates with non-zero
+            Array containing gate masking information. Gates with non-zero
             values will not be included in the mapping.
         offset : tuple of floats
-            Offset of the radar from the grid origin.  Dimension are ordered
+            Offset of the radar from the grid origin. Dimension are ordered
             as z, y, x.
-            Top of atmosphere.  Gates above this level are considered.
+            Top of atmosphere. Gates above this level are considered.
         roi_func : RoIFunction
             Object whose get_roi method returns the radius of influence.
         weighting_function : int

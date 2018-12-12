@@ -11,11 +11,14 @@ Utilities for mapping radar objects to Cartesian grids.
     map_to_grid
     example_roi_func_constant
     example_roi_func_dist
+    example_roi_func_dist_beam
+    example_roi_func_max_space
     _unify_times_for_radars
     _load_nn_field_data
     _gen_roi_func_constant
     _gen_roi_func_dist
     _gen_roi_func_dist_beam
+    _gen_roi_func_max_space
 
 .. autosummary::
     :toctree: generated/
@@ -59,7 +62,7 @@ def grid_from_radars(radars, grid_shape, grid_limits,
         Minimum and maximum grid location (inclusive) in meters for the
         z, y, x coordinates.
     gridding_algo : 'map_to_grid' or 'map_gates_to_grid'
-        Algorithm to use for gridding.  'map_to_grid' finds all gates within
+        Algorithm to use for gridding. 'map_to_grid' finds all gates within
         a radius of influence for each grid point, 'map_gates_to_grid' maps
         each radar gate onto the grid using a radius of influence and is
         typically significantly faster.
@@ -199,12 +202,12 @@ class NNLocator:
     Parameters
     ----------
     data : array_like, (n_sample, n_dimensions)
-        Locations of points to be indexed.  Note that if data is a
+        Locations of points to be indexed. Note that if data is a
         C-contiguous array of dtype float64 the data will not be copied.
         Othersize and internal copy will be made.
     leafsize : int
         The number of points at which the algorithm switches over to
-        brute-force.  This can significantly impact the speed of the
+        brute-force. This can significantly impact the speed of the
         contruction and query of the tree.
     algorithm : 'kd_tree', optional.
         Algorithm used to compute the nearest neigbors. 'kd_tree' uses a
@@ -261,7 +264,7 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
     Map one or more radars to a Cartesian grid.
 
     Generate a Cartesian grid of points for the requested fields from the
-    collected points from one or more radars.  The field value for a grid
+    collected points from one or more radars. The field value for a grid
     point is found by interpolating from the collected points within a given
     radius of influence and weighting these nearby points according to their
     distance from the grid points. Collected points are filtered
@@ -278,7 +281,7 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
         Minimum and maximum grid location (inclusive) in meters for the
         z, y, x coordinates.
     grid_origin : (float, float) or None
-        Latitude and longitude of grid origin.  None sets the origin
+        Latitude and longitude of grid origin. None sets the origin
         to the location of the first radar.
     grid_origin_alt: float or None
         Altitude of grid origin, in meters. None sets the origin
@@ -286,11 +289,11 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
     grid_projection : dic or str
         Projection parameters defining the map projection used to transform the
         locations of the radar gates in geographic coordinate to Cartesian
-        coodinates.  None will use the default dictionary which uses a native
-        azimutal equidistance projection.  See :py:func:`pyart.core.Grid` for
+        coodinates. None will use the default dictionary which uses a native
+        azimutal equidistance projection. See :py:func:`pyart.core.Grid` for
         additional details on this parameter. The geographic coordinates of
         the radar gates are calculated using the projection defined for each
-        radar.  No transformation is used if a grid_origin and grid_origin_alt
+        radar. No transformation is used if a grid_origin and grid_origin_alt
         are None and a single radar is specified.
     fields : list or None
         List of fields within the radar objects which will be mapped to
@@ -298,22 +301,23 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
         present in all the radar objects.
     gatefilters : GateFilter, tuple of GateFilter objects, optional
         Specify what gates from each radar will be included in the
-        interpolation onto the grid.  Only gates specified in each gatefilters
-        will be included in the mapping to the grid.  A single GateFilter can
-        be used if a single Radar is being mapped.  A value of False for a
+        interpolation onto the grid. Only gates specified in each gatefilters
+        will be included in the mapping to the grid. A single GateFilter can
+        be used if a single Radar is being mapped. A value of False for a
         specific element or the entire parameter will apply no filtering of
         gates for a specific radar or all radars (the default).
         Similarily a value of None will create a GateFilter from the
         radar moments using any additional arguments by passing them to
         :py:func:`moment_based_gate_filter`.
     roi_func : str or function
-        Radius of influence function.  A functions which takes an
+        Radius of influence function. A functions which takes an
         z, y, x grid location, in meters, and returns a radius (in meters)
         within which all collected points will be included in the weighting
         for that grid points. Examples can be found in the
         :py:func:`example_roi_func_constant`,
-        :py:func:`example_roi_func_dist`, and
-        :py:func:`example_roi_func_dist_beam`.
+        :py:func:`example_roi_func_dist`,
+        :py:func:`example_roi_func_dist_beam`, and
+        :py:func:`example_roi_func_max_space`.
         Alternatively the following strings can use to specify a built in
         radius of influence function:
 
@@ -329,7 +333,7 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
         `Other Parameters` section below.
     map_roi : bool
         True to include a radius of influence field in the returned
-        dictionary under the 'ROI' key.  This is the value of roi_func at all
+        dictionary under the 'ROI' key. This is the value of roi_func at all
         grid points.
     weighting_function : 'Barnes' or 'Barnes2' or 'Cressman' or 'Nearest'
         Functions used to weight nearby collected points when interpolating a
@@ -361,12 +365,12 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
         the dtype for all fields in the grid will be float64. False will not
         copy the data which preserves the dtype of the fields in the grid,
         may use less memory but results in significantly slower gridding
-        times.  When False gates which are masked in a particular field but
-        are not masked in the  `refl_field` field will still be included in
-        the interpolation.  This can be prevented by setting this parameter
+        times. When False gates which are masked in a particular field but
+        are not masked in the `refl_field` field will still be included in
+        the interpolation. This can be prevented by setting this parameter
         to True or by gridding each field individually setting the
         `refl_field` parameter and the `fields` parameter to the field in
-        question.  It is recommended to set this parameter to True.
+        question. It is recommended to set this parameter to True.
     algorithm : 'kd_tree'.
         Algorithms to use for finding the nearest neighbors. 'kd_tree' is the
         only valid option.
@@ -380,8 +384,8 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
     Returns
     -------
     grids : dict
-        Dictionary of mapped fields.  The keysof the dictionary are given by
-        parameter fields.  Each elements is a `grid_size` float64 array
+        Dictionary of mapped fields. The keys of the dictionary are given by
+        parameter fields. Each elements is a `grid_size` float64 array
         containing the interpolated grid for that field.
 
     See Also
@@ -608,7 +612,7 @@ def map_to_grid(radars, grid_shape, grid_limits, grid_origin=None,
             roi_func = _gen_roi_func_dist_beam(
                 h_factor, nb, bsp, min_radius, offsets)
         elif roi_func == 'max_space':
-            roi_func = _gen_roi_func_max_space(max_az_spacing)
+            roi_func = _gen_roi_func_max_space()
         else:
             raise ValueError('unknown roi_func: %s' % roi_func)
 
@@ -827,6 +831,32 @@ def _gen_roi_func_dist_beam(h_factor, nb, bsp, min_radius, offsets):
     return roi
 
 
+def example_roi_func_max_space(zg, yg, xg):
+    """
+    Example RoI function which returns a radius based on maximum azimuthal
+    spacing.
+
+    Parameters
+    ----------
+    zg, yg, xg : float
+        Distance from the grid center in meters for the x, y and z axes.
+
+    Returns
+    -------
+    roi : float
+
+    """
+    max_space_radars = np.empty(len(radars))
+    for radar in radars:
+        gate_x = radar.gate_x['data'][:, -1]
+        gate_y = radar.gate_y['data'][:, -1]
+        spacing = np.sqrt(np.diff(gate_x)**2 + np.diff(gate_y)**2)
+        max_space_radars.append(np.max(spacing))
+    max_az_spacing = np.max(max_space_radars)
+    r = max_az_space * (8/3)
+    return r
+
+
 def _gen_roi_func_max_space():
     """
     Return a RoI function whose radius is based on maximum azimuthal spacing.
@@ -836,7 +866,14 @@ def _gen_roi_func_max_space():
 
     def roi(zg, yg, xg):
         """ maximum azimuthal spacing radius of influence function. """
-        r = np.maximum(zg)
+        max_space_radars = np.empty(len(radars))
+        for radar in radars:
+            gate_x = radar.gate_x['data'][:, -1]
+            gate_y = radar.gate_y['data'][:, -1]
+            spacing = np.sqrt(np.diff(gate_x)**2 + np.diff(gate_y)**2)
+            max_space_radars.append(np.max(spacing))
+        max_az_spacing = np.max(max_space_radars)
+        r = max_az_space * (8/3)
         return r
 
     return roi

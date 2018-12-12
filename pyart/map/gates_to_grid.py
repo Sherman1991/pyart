@@ -65,9 +65,9 @@ def map_gates_to_grid(
             * dist: radius grows with the distance from each radar.
             * dist_beam: radius grows with the distance from each radar
               and parameter are based of virtual beam sizes.
-            * max_space: radius is delta (maximum azimuthal spacing)
-              multiplied by a factor of 8/3. This follows the recommendation
-              of Pauley and Wu 2010.
+            * max_space: radius is maximum azimuthal spacing multiplied by a
+              factor of 8/3. This follows the recommendation of Pauley and Wu
+              2010.
 
         A custom RoIFunction can be defined using the RoIFunction class
         and defining a get_roi method which returns the radius. For efficient
@@ -201,7 +201,7 @@ def _detemine_cy_weighting_func(weighting_function):
     elif weighting_function.upper() == 'BARNES':
         warnings.warn("Barnes weighting function is deprecated."
                       " Please use Barnes 2 to be consistent with"
-                      " Pauley and Wu 1990.")
+                      " Pauley and Wu 1990.", DeprecationWarning)
         cy_weighting_function = 0
     else:
         raise ValueError('unknown weighting_function')
